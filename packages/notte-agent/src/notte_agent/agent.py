@@ -3,6 +3,7 @@ import traceback
 import typing
 
 from litellm import AllMessageValues
+from notte_browser.captcha import CaptchaHandler
 from notte_browser.session import NotteSession
 from notte_browser.vault import VaultSecretsScreenshotMask
 from notte_core.actions import (
@@ -176,8 +177,9 @@ class NotteAgent(BaseAgent):
                 return CompletionAction(success=False, answer=error_msg)
             case CaptchaSolveAction(captcha_type=captcha_type) if (
                 not self.session.window.resource.options.solve_captchas
+                and not CaptchaHandler.is_available
             ):
-                # if the session doesnt solve captchas => fail immediately
+                # if the session doesnt solve captchas AND local solving is unavailable => fail immediately
                 empty_span = TimedSpan.empty()
                 error_msg = f"Agent encountered {captcha_type} captcha but session doesnt solve captchas: create a session with solve_captchas=True"
                 ex_res = ExecutionResult(

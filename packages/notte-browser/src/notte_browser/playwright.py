@@ -126,15 +126,6 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                     "proxy": options.proxy,
                 }
 
-                if options.solve_captchas:
-                    try:
-                        from playwright_captcha.utils.camoufox_add_init_script.add_init_script import get_addon_path
-                    except ImportError:
-                        pass
-                    else:
-                        camoufox_kwargs["main_world_eval"] = True
-                        camoufox_kwargs["addons"] = [get_addon_path()]
-
                 cm = AsyncCamoufox(**camoufox_kwargs)
                 browser = await cm.__aenter__()
                 self._camoufox_context_manager = cm
@@ -181,6 +172,11 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                 context_kwargs["user_agent"] = options.user_agent
 
             context: BrowserContext = await browser.new_context(**context_kwargs)  # pyright: ignore[reportArgumentType]
+
+            from notte_browser.captcha import CaptchaHandler
+
+            if CaptchaHandler.is_available:
+                await context.add_init_script(CaptchaHandler.CAPTCHA_PROBE_INIT_JS)
 
             if len(context.pages) == 0:
                 page = await context.new_page()

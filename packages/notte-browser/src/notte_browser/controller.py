@@ -100,7 +100,9 @@ class BrowserController:
             )
 
     @profiler.profiled(service_name="execution")
-    async def execute_browser_action(self, window: BrowserWindow, action: BaseAction) -> bool:
+    async def execute_browser_action(
+        self, window: BrowserWindow, action: BaseAction, prev_snapshot: BrowserSnapshot | None = None
+    ) -> bool:
         match action:
             case FormFillAction(value=value):
                 form_filler = FormFiller(window.page)
@@ -108,7 +110,7 @@ class BrowserController:
                 _ = await form_filler.fill_form(unpacked_values)
 
             case CaptchaSolveAction(captcha_type=_):
-                _ = await CaptchaHandler.handle_captchas(window, action)
+                _ = await CaptchaHandler.handle_captchas(window, action, prev_snapshot)
             case GotoAction(url=url):
                 await window.goto(url)
             case GotoNewTabAction(url=url):
@@ -417,7 +419,7 @@ class BrowserController:
                     logger.error("Help action should not be executed inside the controller")
                 retval = False
             case BrowserAction():
-                retval = await self.execute_browser_action(window, action)
+                retval = await self.execute_browser_action(window, action, prev_snapshot)
             case _:
                 raise ValueError(f"Unsupported action type: {type(action)}")
         # Only check for new tabs if the action can potentially create one

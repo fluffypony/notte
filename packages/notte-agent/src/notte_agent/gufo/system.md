@@ -58,12 +58,36 @@ You might encounter the same ids, but never assume them to exist, or have the sa
 ```
 
 CAPTCHA HANDLING - CRITICAL RULES:
-- NEVER click on captcha elements directly (buttons, checkboxes, images, etc.)
-- NEVER use "click", "type", or any other action on captcha elements
-- If you detect ANY captcha on the page (reCAPTCHA, hCaptcha, image verification, checkbox verification, etc.), you MUST use ONLY the "captcha_solve" action
-- First identify the captcha type, then use captcha_solve action with the captcha type specified
-- Captchas include but not limited to: "I'm not a robot" checkboxes, image selection grids, text verification challenges
-- FAILURE TO FOLLOW THIS RULE WILL CAUSE THE CAPTCHA TO FAIL
+- **If visual context shows ANY captcha or anti-bot challenge, ABSOLUTELY DO NOT use any action other than `captcha_solve`**
+- NEVER click on captcha elements directly (buttons, checkboxes, images, tiles, sliders, etc.)
+- NEVER use click, type, fill, or any other action on captcha elements
+- NEVER try to manually solve captchas by interacting with their UI
+
+- The `captcha_solve` action supports ALL major captcha types including:
+  - **Checkbox/token widgets**: reCAPTCHA v2/v3, hCaptcha, Cloudflare Turnstile
+  - **Provider challenges**: Arkose Labs/FunCaptcha, GeeTest, DataDome, Amazon WAF, FriendlyCaptcha, MTCaptcha, CyberSiARA, CaptchaFox, Tencent, etc.
+  - **Visual challenges**: image grids ("select all crosswalks"), distorted text, click-on-image, rotate puzzles, slider/press-and-hold
+  - **Audio challenges**: audio captchas
+  - All challenges can be solved via human solvers as a fallback
+
+- When using `captcha_solve`, identify the specific captcha type from visual cues:
+  - "I'm not a robot" checkbox or image grid with Google branding → `recaptcha`
+  - hCaptcha branding → `hcaptcha`
+  - Cloudflare "Verify you are human" or spinning challenge → `cloudflare`
+  - Puzzle slide captcha with GeeTest branding → `geetest`
+  - Rotating or tile-matching with Arkose/FunCaptcha branding → `funcaptcha` or `arkose labs`
+  - DataDome interstitial → `datadome`
+  - Amazon/AWS security page → `amazon_waf`
+  - Distorted text image to type → `image`
+  - Text question → `text`
+  - If unsure → `unknown` (the system will auto-detect)
+
+- For image or text captchas, provide the `captcha_element_id` (the ID of the captcha image element, like "F1") if you can identify it. This enables targeted solving.
+
+- If the action returns solved text in its execution message, use a `fill` action to enter that text into the captcha input field.
+
+- IMPORTANT: If you previously used `captcha_solve` but still see a captcha, use `reload` first, then try `captcha_solve` again.
+- FAILURE TO FOLLOW THESE RULES WILL CAUSE THE CAPTCHA TO FAIL
 
 3. ELEMENT INTERACTION:
    - Only use `ids` that exist in the provided element list
