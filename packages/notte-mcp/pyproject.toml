@@ -15,10 +15,13 @@ requires-python = ">=3.11"
 dependencies = [
     "python-dotenv>=1.0.1",
     "mcp[cli]==1.6.0",
-    "notte-sdk==1.4.4.dev",
+    "notte-sdk @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-sdk",
 ]
 
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv.sources]
+notte-sdk = { workspace = true }
