@@ -610,12 +610,18 @@ class CaptchaSolveAction(BrowserAction):
     ```python
     session.execute(type="captcha_solve", captcha_type="recaptcha")
     session.execute(type="captcha_solve")  # Auto-detect captcha type
+    session.execute(type="captcha_solve", captcha_type="image", captcha_element_id="F1")
     ```
     """
 
     type: Literal["captcha_solve"] = "captcha_solve"  # pyright: ignore [reportIncompatibleVariableOverride]
     description: str = (
-        "Solve a CAPTCHA challenge on the current page. CRITICAL: Use this action as soon as you notice a captcha"
+        "Solve a CAPTCHA challenge on the current page. Supports all major captcha types including "
+        "reCAPTCHA, hCaptcha, Cloudflare Turnstile, Arkose Labs/FunCaptcha, GeeTest, DataDome, "
+        "Amazon WAF, image/text captchas, grid/click captchas, and more. Human solvers are used "
+        "as a fallback for unrecognized types. CRITICAL: Use this action as soon as you notice a "
+        "captcha. For image or text captchas, provide the captcha element ID in 'captcha_element_id' "
+        "if you can identify it. If you cannot determine the captcha type, use 'unknown'."
     )
     captcha_type: (
         Literal[
@@ -623,26 +629,59 @@ class CaptchaSolveAction(BrowserAction):
             "hcaptcha",
             "image",
             "text",
-            "auth0",
             "cloudflare",
+            "turnstile",
             "datadome",
             "arkose labs",
+            "funcaptcha",
             "geetest",
+            "geetest_v4",
+            "amazon_waf",
+            "mtcaptcha",
+            "friendly_captcha",
+            "keycaptcha",
+            "lemin",
+            "capy",
+            "cybersiara",
+            "cutcaptcha",
+            "atbcaptcha",
+            "tencent",
+            "captchafox",
+            "prosopo",
+            "altcha",
+            "audio",
+            "coordinates",
+            "grid",
+            "rotate",
             "press&hold",
             "unknown",
         ]
         | None
-    ) = None  # Optional field to specify the type of CAPTCHA (e.g., 'recaptcha', 'hcaptcha', etc.)
+    ) = None
+    captcha_element_id: str | None = Field(
+        default=None,
+        description=(
+            "ID of the captcha image/container element (e.g. 'F1') for targeted screenshot solving. "
+            "Provide this for image, text, grid, or coordinate captchas when you can identify the element."
+        ),
+    )
+    solved_text: str | None = Field(default=None, exclude=True)
 
     @override
     def execution_message(self) -> str:
         captcha_desc = f" ({self.captcha_type})" if self.captcha_type else ""
+        if self.solved_text:
+            return (
+                f"Solved CAPTCHA challenge{captcha_desc}. "
+                f"The solution text is: '{self.solved_text}'. "
+                f"Use a fill action to enter this text into the captcha input field."
+            )
         return f"Solved CAPTCHA challenge{captcha_desc} on the current page"
 
     @override
     @staticmethod
     def example() -> "CaptchaSolveAction":
-        return CaptchaSolveAction(captcha_type="recaptcha")
+        return CaptchaSolveAction(captcha_type="unknown")
 
     @property
     @override
@@ -655,11 +694,30 @@ class CaptchaSolveAction(BrowserAction):
                 "hcaptcha",
                 "image",
                 "text",
-                "auth0",
                 "cloudflare",
+                "turnstile",
                 "datadome",
                 "arkose labs",
+                "funcaptcha",
                 "geetest",
+                "geetest_v4",
+                "amazon_waf",
+                "mtcaptcha",
+                "friendly_captcha",
+                "keycaptcha",
+                "lemin",
+                "capy",
+                "cybersiara",
+                "cutcaptcha",
+                "atbcaptcha",
+                "tencent",
+                "captchafox",
+                "prosopo",
+                "altcha",
+                "audio",
+                "coordinates",
+                "grid",
+                "rotate",
                 "press&hold",
                 "unknown",
             ],

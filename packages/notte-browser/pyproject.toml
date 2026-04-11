@@ -24,7 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 camoufox = ["camoufox>=0.4"]
-captcha = ["playwright>=1.55", "playwright-captcha>=0.1.4"]
+captcha = ["2captcha-python>=1.5.0"]
 
 [build-system]
 requires = ["hatchling"]

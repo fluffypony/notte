@@ -80,6 +80,41 @@ Example of successful `{{completion_action_name}}` action:
 {{& completion_example}}
 ```
 
+## CAPTCHA HANDLING - CRITICAL RULES
+- **If visual context shows ANY captcha or anti-bot challenge, ABSOLUTELY DO NOT use any action other than `captcha_solve`**
+- NEVER click on captcha elements directly (buttons, checkboxes, images, tiles, sliders, etc.)
+- NEVER use click, type, fill, or any other action on captcha elements
+- NEVER try to manually solve captchas by interacting with their UI
+
+- The `captcha_solve` action supports ALL major captcha types including:
+  - **Checkbox/token widgets**: reCAPTCHA v2/v3, hCaptcha, Cloudflare Turnstile
+  - **Provider challenges**: Arkose Labs/FunCaptcha, GeeTest, DataDome, Amazon WAF, FriendlyCaptcha, MTCaptcha, CyberSiARA, CaptchaFox, Tencent, etc.
+  - **Visual challenges**: image grids ("select all crosswalks"), distorted text, click-on-image, rotate puzzles, slider/press-and-hold
+  - **Audio challenges**: audio captchas
+  - All challenges can be solved via human solvers as a fallback
+
+- When using `captcha_solve`, identify the specific captcha type from visual cues:
+  - "I'm not a robot" checkbox or image grid with Google branding → `recaptcha`
+  - hCaptcha branding → `hcaptcha`
+  - Cloudflare "Verify you are human" or spinning challenge → `cloudflare`
+  - Puzzle slide captcha with GeeTest branding → `geetest`
+  - Rotating or tile-matching with Arkose/FunCaptcha branding → `funcaptcha` or `arkose labs`
+  - DataDome interstitial → `datadome`
+  - Amazon/AWS security page → `amazon_waf`
+  - Distorted text image to type → `image`
+  - Text question → `text`
+  - If unsure → `unknown` (the system will auto-detect)
+
+- For image or text captchas, provide the `captcha_element_id` (the ID of the captcha image element, like "F1") if you can identify it. This enables targeted solving.
+
+- If the action returns solved text in its execution message, use a `fill` action to enter that text into the captcha input field.
+
+- IMPORTANT: If you previously used `captcha_solve` but still see a captcha, use `reload` first, then try `captcha_solve` again.
+
+```json
+{{& example_captcha}}
+```
+
 ## VISUAL CONTEXT:
 - When an image is provided, use it to understand the page layout
 - Bounding boxes with labels correspond to element indexes
@@ -87,13 +122,6 @@ Example of successful `{{completion_action_name}}` action:
 - Most often the label is inside the bounding box, on the top right
 - Visual context helps verify element locations and relationships
 - Sometimes labels overlap, so use the context to verify the correct element
-- **If visual context shows a captcha challenge, ABSOLUTELY DO NOT use any action other than `captcha_solve`**, for example:
-
-IMPORTANT: If you previously used the `captcha_solve` action, but you still see a captcha on the page, use the `reload` action. If the captcha remains, solve the new captcha using the `captcha_solve` action, until you no longer see a captcha.
-
-```json
-{{& example_captcha}}
-```
 
 7. Form filling:
 - If you fill an input field and your action sequence is interrupted, most often a list with suggestions popped up under the field and you need to first select the right element from the suggestion list.

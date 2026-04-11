@@ -102,7 +102,7 @@ class FalcoPrompt(BasePrompt):
         return FormFillAction(value=form_values).model_dump_agent_json()  # pyright: ignore [reportArgumentType]
 
     def example_captcha(self) -> str:
-        return CaptchaSolveAction(captcha_type="recaptcha").model_dump_agent_json()
+        return CaptchaSolveAction(captcha_type="unknown").model_dump_agent_json()
 
     def example_invalid_sequence(self) -> str:
         return ClickAction(id="X1").model_dump_agent_json()
