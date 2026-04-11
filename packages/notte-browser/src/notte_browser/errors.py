@@ -95,8 +95,11 @@ class BrowserNotAvailableError(BrowserError):
     def __init__(
         self,
         browser_type: str,
+        install_hint: str | None = None,
     ) -> None:
         message = f"{browser_type} is not available. You should use a different browser or use a cloud session via `notte-sdk` instead."
+        if install_hint is not None:
+            message += f" Install the required dependencies with `{install_hint}`."
         super().__init__(
             dev_message=message,
             user_message=message,
@@ -351,7 +354,11 @@ class FailedToDownloadFileError(NotteBaseError):
 
 
 class CaptchaSolverNotAvailableError(NotteBaseError):
-    message: str = "Captcha solving isn't implemented in the open source version. Please use the sdk client: `client.Session(solve_captchas=True)` to enable captcha solving."
+    message: str = (
+        "Captcha solving requires either:\n"
+        "1. Local: Install `notte[captcha]` and set `TWOCAPTCHA_API_KEY`\n"
+        "2. Cloud: Use the SDK client with `client.Session(solve_captchas=True)`"
+    )
 
     def __init__(self) -> None:
         super().__init__(

@@ -1,6 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from notte_core.common.logging import logger
 from notte_core.common.resource import AsyncResource
@@ -34,6 +34,7 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
     BROWSER_OPERATION_TIMEOUT_SECONDS: ClassVar[int] = 30
     verbose: bool = False
     _playwright: Playwright | None = PrivateAttr(default=None)
+    _camoufox_context_manager: Any | None = PrivateAttr(default=None)
 
     @override
     async def astart(self) -> None:
@@ -70,6 +71,10 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                     return await self.playwright.chromium.connect_over_cdp(options.cdp_url)
                 case "firefox":
                     return await self.playwright.firefox.connect(options.cdp_url)
+                case _:
+                    raise BrowserNotAvailableError(browser_type=options.browser_type)
+        except BrowserNotAvailableError:
+            raise
         except Exception as e:
             raise CdpConnectionError(options.cdp_url) from e
 
@@ -86,7 +91,7 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                 logger.info(f"🪟 [Browser Settings] Connecting to browser over CDP at {options.cdp_url}")
             if options.proxy is not None:
                 logger.info(f"🪟 [Browser Settings] Using proxy {options.proxy.get('server', 'unknown')}")
-            if options.browser_type == "firefox":
+            if options.browser_type in ("firefox", "camoufox"):
                 logger.info(
                     f"🪟 [Browser Settings] Using {options.browser_type} browser. Note that CDP may not be supported for this browser."
                 )
@@ -107,6 +112,32 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                     timeout=self.BROWSER_CREATION_TIMEOUT_SECONDS * 1000,
                     args=options.get_chrome_args(),
                 )
+            case "camoufox":
+                try:
+                    from camoufox.async_api import AsyncCamoufox
+                except ImportError as exc:
+                    raise BrowserNotAvailableError(
+                        browser_type="camoufox",
+                        install_hint="pip install notte[camoufox]",
+                    ) from exc
+
+                camoufox_kwargs: dict[str, Any] = {
+                    "headless": options.headless,
+                    "proxy": options.proxy,
+                }
+
+                if options.solve_captchas:
+                    try:
+                        from playwright_captcha.utils.camoufox_add_init_script.add_init_script import get_addon_path
+                    except ImportError:
+                        pass
+                    else:
+                        camoufox_kwargs["main_world_eval"] = True
+                        camoufox_kwargs["addons"] = [get_addon_path()]
+
+                cm = AsyncCamoufox(**camoufox_kwargs)
+                browser = await cm.__aenter__()
+                self._camoufox_context_manager = cm
             case _:
                 # TODO: add firefox support: this is not currently supported by patchright
                 # browser = await self.playwright.firefox.launch(
@@ -131,21 +162,25 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                     f"🪟 No viewport set in {'headless' if options.headless else 'headful'} mode, using default viewport in playwright"
                 )
 
-            context: BrowserContext = await browser.new_context(
+            context_kwargs: dict[str, Any] = {
                 # no viewport should be False for headless browsers
-                no_viewport=not options.headless,
-                viewport=viewport,  # pyright: ignore[reportArgumentType]
-                permissions=[
+                "no_viewport": not options.headless,
+                "viewport": viewport,
+                "permissions": [
                     # Needed for clipboard copy/paste to respect tabs / new lines for chromium browsers
                     "clipboard-read",
                     "clipboard-write",
                 ]
                 if options.browser_type in ["chromium", "chrome"]
                 else [],
-                proxy=options.proxy,
-                user_agent=options.user_agent,
-                extra_http_headers=options.extra_http_headers,
-            )
+                "proxy": options.proxy,
+                "extra_http_headers": options.extra_http_headers,
+            }
+
+            if options.user_agent is not None:
+                context_kwargs["user_agent"] = options.user_agent
+
+            context: BrowserContext = await browser.new_context(**context_kwargs)  # pyright: ignore[reportArgumentType]
 
             if len(context.pages) == 0:
                 page = await context.new_page()
@@ -159,16 +194,20 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
     @override
     @profiler.profiled()
     async def new_window(self, options: BrowserWindowOptions | None = None) -> BrowserWindow:
-        if not self.is_started():
-            _ = await self.astart()
         options = options or BrowserWindowOptions.from_request(SessionStartRequest())
+        if not self.is_started() and options.browser_type != "camoufox":
+            _ = await self.astart()
         browser = await self.create_playwright_browser(options)
         resource = await self.get_browser_resource(options, browser)
 
         async def on_close() -> None:
             try:
                 async with asyncio.timeout(self.BROWSER_OPERATION_TIMEOUT_SECONDS):
-                    await browser.close()
+                    if self._camoufox_context_manager is not None:
+                        await self._camoufox_context_manager.__aexit__(None, None, None)
+                        self._camoufox_context_manager = None
+                    else:
+                        await browser.close()
                     await self.astop()
             except Exception as e:
                 logger.error(f"Failed to close window: {e}")

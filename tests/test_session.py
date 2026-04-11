@@ -242,11 +242,12 @@ def test_remote_storage_raises_on_local_session():
         _ = NotteSession(storage=_FakeRemoteStorage())
 
 
-def test_captcha_solver_not_available_error():
+def test_captcha_solver_not_available_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(CaptchaHandler, "_check_available", classmethod(lambda cls: False))
     with pytest.raises(CaptchaSolverNotAvailableError):
         _ = NotteSession(solve_captchas=True, browser_type="chrome")
 
-    CaptchaHandler.is_available = True
+    monkeypatch.setattr(CaptchaHandler, "_check_available", classmethod(lambda cls: True))
     _ = NotteSession(solve_captchas=True, browser_type="chrome")
     CaptchaHandler.is_available = False
 

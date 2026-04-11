@@ -21,6 +21,8 @@ dependencies = [
 integrations = ["notte-integrations==1.4.4.dev"]
 eval = ["notte-eval==1.4.4.dev"]
 mcp = ["notte-mcp==1.4.4.dev"]
+camoufox = ["camoufox>=0.4"]
+captcha = ["playwright>=1.55", "playwright-captcha>=0.1.4"]
 
 [tool.uv.sources]
 notte-core = { workspace = true }
