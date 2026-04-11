@@ -43,6 +43,9 @@ exclude = ["packages/notte-bua"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/notte"]
