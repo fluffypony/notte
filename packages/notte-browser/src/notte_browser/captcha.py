@@ -840,11 +840,8 @@ class CaptchaHandler:
                         "() => { const a = document.querySelector('audio[src], source[src]'); return a ? a.src || a.getAttribute('src') : null; }"
                     )
                 if audio_src:
-                    import httpx
-
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.get(audio_src)
-                        audio_bytes = resp.content
+                    resp = await page.context.request.get(audio_src)
+                    audio_bytes = await resp.body()
                     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                         f.write(audio_bytes)
                         tmp_path = f.name
