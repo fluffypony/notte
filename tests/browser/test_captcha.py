@@ -1,7 +1,5 @@
 import sys
 import types
-from collections.abc import Callable
-from enum import Enum
 from types import SimpleNamespace
 
 import pytest
@@ -9,79 +7,21 @@ from notte_browser.captcha import CaptchaHandler
 from notte_core.actions import CaptchaSolveAction
 
 
-def _install_fake_captcha_modules(
-    monkeypatch: pytest.MonkeyPatch,
-    outcomes: dict[object, object] | Callable[[type[Enum]], dict[object, object]] | None = None,
-):
-    state = {
-        "api_keys": [],
-        "frameworks": [],
-        "calls": [],
-        "instances": 0,
-    }
+def _install_fake_twocaptcha(monkeypatch: pytest.MonkeyPatch):
+    """Install a fake twocaptcha module so _check_available works without the real SDK."""
+    twocaptcha_mod = types.ModuleType("twocaptcha")
 
-    class CaptchaType(Enum):
-        CLOUDFLARE_INTERSTITIAL = "cloudflare_interstitial"
-        CLOUDFLARE_TURNSTILE = "cloudflare_turnstile"
-        RECAPTCHA_V2 = "recaptcha_v2"
-        RECAPTCHA_V3 = "recaptcha_v3"
+    class FakeTwoCaptcha:
+        def __init__(self, api_key, **kwargs):
+            self.api_key = api_key
 
-    class FrameworkType(Enum):
-        PLAYWRIGHT = "playwright"
-        CAMOUFOX = "camoufox"
-        PATCHRIGHT = "patchright"
-
-    outcomes = outcomes(CaptchaType) if callable(outcomes) else (outcomes or {})
-
-    class AsyncTwoCaptcha:
-        def __init__(self, api_key: str):
-            state["api_keys"].append(api_key)
-
-    class TwoCaptchaSolver:
-        def __init__(self, framework, page, async_two_captcha_client):
-            state["frameworks"].append(framework)
-            state["instances"] += 1
-            self.page = page
-            self.async_two_captcha_client = async_two_captcha_client
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *_args):
-            return None
-
-        async def solve_captcha(self, captcha_container, captcha_type):
-            state["calls"].append(captcha_type)
-            outcome = outcomes.get(captcha_type, True)
-            if isinstance(outcome, Exception):
-                raise outcome
-            return outcome
-
-    playwright_captcha = types.ModuleType("playwright_captcha")
-    playwright_captcha.CaptchaType = CaptchaType
-    playwright_captcha.FrameworkType = FrameworkType
-    playwright_captcha.TwoCaptchaSolver = TwoCaptchaSolver
-    monkeypatch.setitem(sys.modules, "playwright_captcha", playwright_captcha)
-
-    twocaptcha = types.ModuleType("twocaptcha")
-    twocaptcha.AsyncTwoCaptcha = AsyncTwoCaptcha
-    monkeypatch.setitem(sys.modules, "twocaptcha", twocaptcha)
-
-    return state, CaptchaType, FrameworkType
-
-
-class _DummyWindow:
-    def __init__(self, browser_type: str = "chrome"):
-        self.page = object()
-        self.wait_calls = 0
-        self.resource = SimpleNamespace(options=SimpleNamespace(browser_type=browser_type))
-
-    async def long_wait(self):
-        self.wait_calls += 1
+    twocaptcha_mod.TwoCaptcha = FakeTwoCaptcha
+    monkeypatch.setitem(sys.modules, "twocaptcha", twocaptcha_mod)
+    return FakeTwoCaptcha
 
 
 def test_check_available_requires_api_key(monkeypatch: pytest.MonkeyPatch):
-    _install_fake_captcha_modules(monkeypatch)
+    _install_fake_twocaptcha(monkeypatch)
     monkeypatch.delenv("TWOCAPTCHA_API_KEY", raising=False)
     monkeypatch.delenv("TWO_CAPTCHA_API_KEY", raising=False)
     assert CaptchaHandler._check_available() is False
@@ -90,53 +30,66 @@ def test_check_available_requires_api_key(monkeypatch: pytest.MonkeyPatch):
     assert CaptchaHandler._check_available() is True
 
 
+def test_check_available_accepts_alternate_env_var(monkeypatch: pytest.MonkeyPatch):
+    _install_fake_twocaptcha(monkeypatch)
+    monkeypatch.delenv("TWOCAPTCHA_API_KEY", raising=False)
+    monkeypatch.delenv("TWO_CAPTCHA_API_KEY", raising=False)
+
+    monkeypatch.setenv("TWO_CAPTCHA_API_KEY", "alt-key")
+    assert CaptchaHandler._check_available() is True
+
+
+def test_normalize_type_aliases():
+    assert CaptchaHandler._normalize_type("cloudflare") == "turnstile"
+    assert CaptchaHandler._normalize_type("arkose labs") == "funcaptcha"
+    assert CaptchaHandler._normalize_type("CLOUDFLARE") == "turnstile"
+    assert CaptchaHandler._normalize_type("press&hold") == "press_hold"
+    assert CaptchaHandler._normalize_type("recaptcha_v2") == "recaptcha"
+    assert CaptchaHandler._normalize_type("recaptcha_v3") == "recaptcha"
+    assert CaptchaHandler._normalize_type("recaptcha enterprise") == "recaptcha"
+    assert CaptchaHandler._normalize_type("cf") == "turnstile"
+    assert CaptchaHandler._normalize_type("friendly") == "friendly_captcha"
+    assert CaptchaHandler._normalize_type("amazon") == "amazon_waf"
+    assert CaptchaHandler._normalize_type(None) == "unknown"
+    assert CaptchaHandler._normalize_type("") == "unknown"
+    assert CaptchaHandler._normalize_type("recaptcha") == "recaptcha"
+    assert CaptchaHandler._normalize_type("hcaptcha") == "hcaptcha"
+
+
+def test_captcha_solve_action_fields():
+    action = CaptchaSolveAction(captcha_type="recaptcha")
+    assert action.captcha_type == "recaptcha"
+    assert action.captcha_element_id is None
+    assert action.solved_text is None
+
+    dumped = action.model_dump()
+    assert "solved_text" not in dumped
+    assert "captcha_element_id" in dumped
+
+
+def test_captcha_solve_action_execution_message_with_solved_text():
+    action = CaptchaSolveAction(captcha_type="image")
+    action.solved_text = "XY42Z"
+    msg = action.execution_message()
+    assert "XY42Z" in msg
+    assert "fill" in msg.lower()
+
+
+def test_captcha_solve_action_execution_message_without_solved_text():
+    action = CaptchaSolveAction(captcha_type="recaptcha")
+    msg = action.execution_message()
+    assert "recaptcha" in msg.lower()
+    assert "solved" not in msg.lower() or "Solved" in msg
+
+
 @pytest.mark.asyncio
-async def test_handle_captchas_uses_recaptcha_solver(monkeypatch: pytest.MonkeyPatch):
-    state, captcha_type_enum, framework_type_enum = _install_fake_captcha_modules(monkeypatch)
-    monkeypatch.setenv("TWOCAPTCHA_API_KEY", "test-key")
-    window = _DummyWindow(browser_type="camoufox")
+async def test_handle_captchas_raises_without_api_key(monkeypatch: pytest.MonkeyPatch):
+    from notte_browser.errors import CaptchaSolverNotAvailableError
 
-    result = await CaptchaHandler.handle_captchas(window, CaptchaSolveAction(captcha_type="recaptcha"))
+    monkeypatch.delenv("TWOCAPTCHA_API_KEY", raising=False)
+    monkeypatch.delenv("TWO_CAPTCHA_API_KEY", raising=False)
 
-    assert result is True
-    assert window.wait_calls == 1
-    assert state["api_keys"] == ["test-key"]
-    assert state["frameworks"] == [framework_type_enum.CAMOUFOX]
-    assert state["calls"] == [captcha_type_enum.RECAPTCHA_V2]
+    window = SimpleNamespace(page=object(), resource=SimpleNamespace(options=SimpleNamespace()))
 
-
-@pytest.mark.asyncio
-async def test_handle_captchas_falls_back_across_cloudflare_candidates(monkeypatch: pytest.MonkeyPatch):
-    state, captcha_type_enum, framework_type_enum = _install_fake_captcha_modules(
-        monkeypatch,
-        outcomes=lambda captcha_type: {
-            captcha_type.CLOUDFLARE_TURNSTILE: RuntimeError("not found"),
-            captcha_type.CLOUDFLARE_INTERSTITIAL: True,
-        },
-    )
-    monkeypatch.setenv("TWOCAPTCHA_API_KEY", "test-key")
-    window = _DummyWindow(browser_type="chrome")
-
-    result = await CaptchaHandler.handle_captchas(window, CaptchaSolveAction(captcha_type="cloudflare"))
-
-    assert result is True
-    assert window.wait_calls == 1
-    assert state["frameworks"] == [framework_type_enum.PATCHRIGHT]
-    assert state["calls"] == [
-        captcha_type_enum.CLOUDFLARE_TURNSTILE,
-        captcha_type_enum.CLOUDFLARE_INTERSTITIAL,
-    ]
-
-
-@pytest.mark.asyncio
-async def test_handle_captchas_returns_true_for_unsupported_hint(monkeypatch: pytest.MonkeyPatch):
-    state, _, _ = _install_fake_captcha_modules(monkeypatch)
-    monkeypatch.setenv("TWOCAPTCHA_API_KEY", "test-key")
-    window = _DummyWindow(browser_type="chrome")
-
-    result = await CaptchaHandler.handle_captchas(window, CaptchaSolveAction(captcha_type="hcaptcha"))
-
-    assert result is True
-    assert window.wait_calls == 1
-    assert state["instances"] == 0
-    assert state["calls"] == []
+    with pytest.raises(CaptchaSolverNotAvailableError):
+        await CaptchaHandler.handle_captchas(window, CaptchaSolveAction(captcha_type="recaptcha"))

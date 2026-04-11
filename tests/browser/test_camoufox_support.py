@@ -74,30 +74,13 @@ async def test_create_playwright_browser_uses_async_camoufox(monkeypatch: pytest
     monkeypatch.setitem(sys.modules, "camoufox", camoufox_pkg)
     monkeypatch.setitem(sys.modules, "camoufox.async_api", camoufox_async_api)
 
-    addon_module = types.ModuleType("playwright_captcha.utils.camoufox_add_init_script.add_init_script")
-    addon_module.get_addon_path = lambda: "/tmp/camoufox-addon"
-    monkeypatch.setitem(sys.modules, "playwright_captcha", types.ModuleType("playwright_captcha"))
-    monkeypatch.setitem(sys.modules, "playwright_captcha.utils", types.ModuleType("playwright_captcha.utils"))
-    monkeypatch.setitem(
-        sys.modules,
-        "playwright_captcha.utils.camoufox_add_init_script",
-        types.ModuleType("playwright_captcha.utils.camoufox_add_init_script"),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "playwright_captcha.utils.camoufox_add_init_script.add_init_script",
-        addon_module,
-    )
-
     manager = PlaywrightManager()
-    browser = await manager.create_playwright_browser(_make_options(solve_captchas=True))
+    browser = await manager.create_playwright_browser(_make_options())
 
     assert browser is fake_browser
     assert manager._camoufox_context_manager is not None
     assert created_kwargs["headless"] is True
     assert created_kwargs["proxy"] is None
-    assert created_kwargs["main_world_eval"] is True
-    assert created_kwargs["addons"] == ["/tmp/camoufox-addon"]
 
 
 @pytest.mark.asyncio
