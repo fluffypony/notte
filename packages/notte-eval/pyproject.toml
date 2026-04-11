@@ -13,12 +13,12 @@ packages = [
 
 requires-python = ">=3.11"
 dependencies = [
-    "notte-agent==1.4.4.dev",
-    "notte-browser==1.4.4.dev",
-    "notte-core==1.4.4.dev",
-    "notte-llm==1.4.4.dev",
-    "notte-sdk==1.4.4.dev",
-    "notte-integrations==1.4.4.dev",
+    "notte-agent @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-agent",
+    "notte-browser @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-browser",
+    "notte-core @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-core",
+    "notte-llm @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-llm",
+    "notte-sdk @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-sdk",
+    "notte-integrations @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-integrations",
     "pandas",
     "pebble>=5.1.1",
     "cloudpickle>=3.1.1",
@@ -85,4 +85,10 @@ reportAny = false
 reportExplicitAny = false
 
 [tool.uv.sources]
+notte-core = { workspace = true }
+notte-llm = { workspace = true }
+notte-sdk = { workspace = true }
+notte-browser = { workspace = true }
+notte-agent = { workspace = true }
+notte-integrations = { workspace = true }
 maincontentextractor = { git = "https://github.com/HawkClaws/main_content_extractor", rev = "7c3ed7f6ed7f6c10223a3357d43ab741663bc812" }

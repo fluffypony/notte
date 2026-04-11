@@ -9,18 +9,18 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "notte-core==1.4.4.dev",
-    "notte-sdk==1.4.4.dev",
-    "notte-browser==1.4.4.dev",
-    "notte-agent==1.4.4.dev",
+    "notte-core @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-core",
+    "notte-sdk @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-sdk",
+    "notte-browser @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-browser",
+    "notte-agent @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-agent",
     "google-auth>=2.39.0",
     "toml>=0.10.2",
 ]
 
 [project.optional-dependencies]
-integrations = ["notte-integrations==1.4.4.dev"]
-eval = ["notte-eval==1.4.4.dev"]
-mcp = ["notte-mcp==1.4.4.dev"]
+integrations = ["notte-integrations @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-integrations"]
+eval = ["notte-eval @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-eval"]
+mcp = ["notte-mcp @ git+https://github.com/fluffypony/notte.git@main#subdirectory=packages/notte-mcp"]
 camoufox = ["camoufox>=0.4"]
 captcha = ["2captcha-python>=1.5.0"]
 
