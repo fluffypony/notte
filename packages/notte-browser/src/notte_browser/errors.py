@@ -354,17 +354,19 @@ class FailedToDownloadFileError(NotteBaseError):
 
 
 class CaptchaSolverNotAvailableError(NotteBaseError):
-    message: str = (
-        "Captcha solving requires either:\n"
-        "1. Local: Install `notte[captcha]` and set `TWOCAPTCHA_API_KEY`\n"
-        "2. Cloud: Use the SDK client with `client.Session(solve_captchas=True)`"
-    )
-
     def __init__(self) -> None:
         super().__init__(
-            dev_message=self.message,
-            user_message=self.message,
-            agent_message=self.message,
+            dev_message=(
+                "Captcha solving requires either:\n"
+                "1. Local: Install `notte[captcha]` (provides 2captcha-python) and set "
+                "`TWOCAPTCHA_API_KEY` environment variable\n"
+                "2. Cloud: Use the SDK client with `client.Session(solve_captchas=True)`"
+            ),
+            user_message="Captcha solver is not available.",
+            agent_message=(
+                "Captcha solving is not configured. Set the TWOCAPTCHA_API_KEY environment "
+                "variable or use the cloud SDK with solve_captchas=True."
+            ),
         )
 
 
