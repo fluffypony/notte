@@ -110,6 +110,8 @@ class BrowserWindowOptions(BaseModel):
         return DEFAULT_HEADLESS_VIEWPORT_WIDTH, round(DEFAULT_HEADLESS_VIEWPORT_WIDTH * height_ratio / width_ratio)
 
     def get_chrome_args(self) -> list[str]:
+        if self.browser_type == "camoufox":
+            return []
         chrome_args = self.chrome_args or []
         if self.chrome_args is None:
             chrome_args.extend(
@@ -289,7 +291,7 @@ class BrowserWindow(BaseModel):
     @property
     def is_chromium_based(self) -> bool:
         """Check if the browser is Chromium-based (supports CDP)."""
-        return self.resource.options.browser_type != "firefox"
+        return self.resource.options.browser_type not in ("firefox", "camoufox")
 
     async def get_cdp_session(self, tab_idx: int | None = None) -> CDPSession:
         cdp_page = self.tabs[tab_idx] if tab_idx is not None else self.page

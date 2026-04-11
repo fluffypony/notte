@@ -708,7 +708,7 @@ class SessionStartRequestDict(TypedDict, total=False):
         max_duration_minutes: Maximum session lifetime in minutes (absolute maximum).
         idle_timeout_minutes: Idle timeout in minutes. Session closes after this period of inactivity.
         proxies: List of custom proxies to use for the session. If True, the default proxies will be used.
-        browser_type: The browser type to use. Can be chromium or chrome.
+        browser_type: The browser type to use. Can be chromium, chrome, firefox, or camoufox.
         user_agent: The user agent to use for the session
         chrome_args: Overwrite the chrome instance arguments
         viewport_width: The width of the viewport
@@ -776,7 +776,7 @@ class SessionStartRequest(SdkRequest):
         ),
     ] = False
     browser_type: Annotated[
-        BrowserType, Field(description="The browser type to use. Can be chromium, chrome or firefox.")
+        BrowserType, Field(description="The browser type to use. Can be chromium, chrome, firefox, or camoufox.")
     ] = DEFAULT_BROWSER_TYPE
     user_agent: Annotated[str | None, Field(description="The user agent to use for the session")] = DEFAULT_USER_AGENT
     chrome_args: Annotated[list[str] | None, Field(description="Overwrite the chrome instance arguments")] = Field(

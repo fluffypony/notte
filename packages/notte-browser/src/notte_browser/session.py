@@ -136,6 +136,7 @@ class NotteSession(AsyncResource, SyncResource):
                 "RemoteFileStorage is not supported for local sessions. Use a local storage implementation instead."
             )
         self._request: SessionStartRequest = SessionStartRequest.model_validate(data)
+        CaptchaHandler.is_available = CaptchaHandler._check_available()
         if self._request.solve_captchas and not CaptchaHandler.is_available:
             raise CaptchaSolverNotAvailableError()
         self.screenshot_type: ScreenshotType = self._request.screenshot_type
