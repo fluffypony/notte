@@ -1,8 +1,4 @@
-"""Captcha solver using 2Captcha API directly for comprehensive captcha type coverage.
-
-Replaces the previous playwright-captcha wrapper with direct 2captcha-python SDK calls.
-Supports all 2Captcha task types including human/image solving.
-"""
+"""Captcha solving via 2Captcha API with support for all major captcha types and human fallback."""
 
 from __future__ import annotations
 
