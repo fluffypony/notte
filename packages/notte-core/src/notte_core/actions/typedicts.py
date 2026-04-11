@@ -171,16 +171,36 @@ class CaptchaSolveActionDict(TypedDict, total=False):
             "hcaptcha",
             "image",
             "text",
-            "auth0",
             "cloudflare",
+            "turnstile",
             "datadome",
             "arkose labs",
+            "funcaptcha",
             "geetest",
+            "geetest_v4",
+            "amazon_waf",
+            "mtcaptcha",
+            "friendly_captcha",
+            "keycaptcha",
+            "lemin",
+            "capy",
+            "cybersiara",
+            "cutcaptcha",
+            "atbcaptcha",
+            "tencent",
+            "captchafox",
+            "prosopo",
+            "altcha",
+            "audio",
+            "coordinates",
+            "grid",
+            "rotate",
             "press&hold",
             "unknown",
         ]
         | None
     ]
+    captcha_element_id: NotRequired[str | None]
 
 
 class HelpActionDict(TypedDict):
