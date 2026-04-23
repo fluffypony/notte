@@ -315,52 +315,138 @@ class BrowserWindow(BaseModel):
             tabs=[await self.tab_metadata(i) for i, _ in enumerate(self.tabs)],
         )
 
+    # Per-attempt timeout for a single CDP screenshot (attach + capture + detach).
+    # Bounds hangs so the retry loop can actually retry instead of blocking on a stuck session.
+    CDP_SCREENSHOT_TIMEOUT_S: ClassVar[float] = 10.0
+    CDP_SCREENSHOT_MAX_ATTEMPTS: ClassVar[int] = 3
+
     @profiler.profiled(service_name="observation")
     async def _cdp_screenshot(self) -> bytes:
         """Take a screenshot using CDP protocol (faster than Playwright, but no mask support)."""
-        cdp_session = await self.get_cdp_session()
-        try:
-            result: dict[str, Any] = await cdp_session.send(  # pyright: ignore [reportUnknownMemberType]
-                "Page.captureScreenshot",
-                {"format": "jpeg", "quality": 85},
-            )
-            return base64.b64decode(result["data"])
-        finally:
-            await cdp_session.detach()
+
+        async def _run() -> bytes:
+            t_attach = time.monotonic()
+            cdp_session = await self.get_cdp_session()
+            attach_ms = (time.monotonic() - t_attach) * 1000
+            try:
+                t_send = time.monotonic()
+                result: dict[str, Any] = await cdp_session.send(  # pyright: ignore [reportUnknownMemberType]
+                    "Page.captureScreenshot",
+                    {"format": "jpeg", "quality": 85},
+                )
+                send_ms = (time.monotonic() - t_send) * 1000
+                data = base64.b64decode(result["data"])
+                logger.trace(
+                    f"CDP screenshot for {self.page.url}: attach={attach_ms:.0f}ms send={send_ms:.0f}ms size={len(data)}B"
+                )
+                return data
+            finally:
+                t_detach = time.monotonic()
+                url = self.page.url
+                # Shield detach from outer wait_for cancellation — otherwise a timeout here
+                # would skip detach and leak the CDP session, which is the exact contention
+                # this path is trying to surface. Inner wait_for bounds detach itself so a
+                # hung detach can't live forever in the background task set. Attach a done
+                # callback so the task's result is still logged if the outer await is
+                # cancelled and leaves it running unobserved.
+                detach_task: asyncio.Task[None] = asyncio.ensure_future(
+                    asyncio.wait_for(cdp_session.detach(), timeout=2.0)
+                )
+
+                def _log_detach(task: "asyncio.Task[None]") -> None:
+                    elapsed_ms = (time.monotonic() - t_detach) * 1000
+                    if task.cancelled():
+                        logger.warning(f"CDP session detach for {url} was cancelled after {elapsed_ms:.0f}ms")
+                        return
+                    exc = task.exception()
+                    if exc is not None:
+                        logger.warning(
+                            f"CDP session detach for {url} failed after {elapsed_ms:.0f}ms: {type(exc).__name__}: {exc}"
+                        )
+                    elif elapsed_ms > 500:
+                        logger.warning(
+                            f"CDP session detach for {url} took {elapsed_ms:.0f}ms (attach={attach_ms:.0f}ms)"
+                        )
+
+                detach_task.add_done_callback(_log_detach)
+                try:
+                    await asyncio.shield(detach_task)
+                except Exception:
+                    pass  # _log_detach handles logging via the done callback
+
+        return await asyncio.wait_for(_run(), timeout=self.CDP_SCREENSHOT_TIMEOUT_S)
 
     @profiler.profiled(service_name="observation")
-    async def screenshot(self, retries: int = config.empty_page_max_retry) -> bytes:
+    async def screenshot(self, retries: int = config.empty_page_max_retry, *, _skip_cdp: bool = False) -> bytes:
         if retries <= 0:
             raise EmptyPageContentError(url=self.page.url, nb_retries=config.empty_page_max_retry)
+        cdp_exhausted = _skip_cdp
         try:
             # Use CDP screenshot when no mask is needed and browser supports CDP (faster)
-            if self.screenshot_mask is None and self.is_chromium_based:
-                try:
-                    return await self._cdp_screenshot()
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    logger.debug(f"CDP screenshot failed for {self.page.url}, falling back to Playwright")
-                    pass  # Fall back to Playwright if CDP fails
+            if not _skip_cdp and self.screenshot_mask is None and self.is_chromium_based:
+                cdp_start = time.monotonic()
+                for attempt in range(1, self.CDP_SCREENSHOT_MAX_ATTEMPTS + 1):
+                    attempt_start = time.monotonic()
+                    try:
+                        return await self._cdp_screenshot()
+                    except asyncio.CancelledError:
+                        raise
+                    except asyncio.TimeoutError:
+                        attempt_ms = (time.monotonic() - attempt_start) * 1000
+                        logger.warning(
+                            f"CDP screenshot timed out after {attempt_ms:.0f}ms for {self.page.url} (attempt {attempt}/{self.CDP_SCREENSHOT_MAX_ATTEMPTS}, budget={self.CDP_SCREENSHOT_TIMEOUT_S}s)"
+                        )
+                    except Exception as e:
+                        attempt_ms = (time.monotonic() - attempt_start) * 1000
+                        logger.opt(exception=True).warning(
+                            f"CDP screenshot failed after {attempt_ms:.0f}ms for {self.page.url} (attempt {attempt}/{self.CDP_SCREENSHOT_MAX_ATTEMPTS}): {type(e).__name__}: {e}"
+                        )
+                    if attempt < self.CDP_SCREENSHOT_MAX_ATTEMPTS:
+                        await self.short_wait()
+                total_ms = (time.monotonic() - cdp_start) * 1000
+                logger.warning(
+                    f"CDP screenshot exhausted {self.CDP_SCREENSHOT_MAX_ATTEMPTS} attempts ({total_ms:.0f}ms total) for {self.page.url}, falling back to Playwright"
+                )
+                cdp_exhausted = True
 
             # Fall back to Playwright screenshot when mask is needed, CDP failed, or browser doesn't support CDP
             # Retry up to 2 times - DOM may change between mask creation and screenshot
             last_error: Exception | None = None
-            for _ in range(3):
+            for pw_attempt in range(1, 4):
+                pw_start = time.monotonic()
                 try:
+                    t_mask = time.monotonic()
                     mask = await self.screenshot_mask.mask(self.page) if self.screenshot_mask is not None else None
-                    return await self.page.screenshot(mask=mask, type="jpeg", quality=85)
+                    mask_ms = (time.monotonic() - t_mask) * 1000
+                    t_shot = time.monotonic()
+                    data = await self.page.screenshot(mask=mask, type="jpeg", quality=85)
+                    shot_ms = (time.monotonic() - t_shot) * 1000
+                    logger.trace(
+                        f"Playwright screenshot for {self.page.url}: mask={mask_ms:.0f}ms shot={shot_ms:.0f}ms size={len(data)}B attempt={pw_attempt}"
+                    )
+                    return data
                 except PlaywrightTimeoutError:
+                    pw_ms = (time.monotonic() - pw_start) * 1000
+                    logger.warning(
+                        f"Playwright screenshot timed out after {pw_ms:.0f}ms for {self.page.url} (attempt {pw_attempt}/3)"
+                    )
                     raise  # Let outer handler deal with timeouts
                 except Exception as e:
+                    pw_ms = (time.monotonic() - pw_start) * 1000
+                    logger.opt(exception=True).warning(
+                        f"Playwright screenshot failed after {pw_ms:.0f}ms for {self.page.url} (attempt {pw_attempt}/3): {type(e).__name__}: {e}"
+                    )
                     last_error = e
             raise last_error  # type: ignore[misc]
 
         except PlaywrightTimeoutError:
-            if config.verbose:
-                logger.debug(f"Timeout while taking screenshot for {self.page.url}. Retrying...")
+            logger.warning(
+                f"Playwright screenshot timeout for {self.page.url}, retrying (remaining outer retries: {retries - 1})"
+            )
             await self.short_wait()
-            return await self.screenshot(retries=retries - 1)
+            # Skip CDP on recursion if already exhausted — otherwise up to 30s of CDP retries
+            # compound on every outer retry (5 × 30s = 150s worst case).
+            return await self.screenshot(retries=retries - 1, _skip_cdp=cdp_exhausted)
 
     async def a11y(self) -> A11yTree | None:
         a11y_simple: A11yNode | None = await profiler.profiled(service_name="observation")(
