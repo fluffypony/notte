@@ -17,6 +17,7 @@ from litellm.exceptions import (
     BadRequestError,
     NotFoundError,
     RateLimitError,
+    Timeout,
 )
 from litellm.exceptions import (
     ContextWindowExceededError as LiteLLMContextWindowExceededError,
@@ -567,12 +568,24 @@ class LLMEngine:
                 max_completion_tokens=8192,
                 drop_params=True,
                 extra_body=extra_body,
+                # Bound the HTTP call so a stalled upstream stream cannot park the event loop
+                # indefinitely. Without this, httpx has no read timeout and silent server
+                # stalls hang the whole agent run.
+                timeout=60,
             )
             # Cast to ModelResponse since we know it's not streaming in this case
             return cast(ModelResponse, response)
 
         except NotFoundError as e:
             raise ModelNotFoundError(model) from e
+        except Timeout as e:
+            logger.warning(f"LLM request to {model} timed out after 60s: {e}")
+            raise LLMProviderError(
+                dev_message=f"LLM request to {model} timed out: {str(e)}",
+                user_message="The LLM provider did not respond in time.",
+                agent_message=None,
+                should_retry_later=True,
+            ) from e
         except RateLimitError as e:
             logger.opt(exception=True).error(
                 f"Rate limit exceeded for model {model}. You should wait a few seconds before retrying..."
