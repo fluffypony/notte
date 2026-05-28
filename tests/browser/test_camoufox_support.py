@@ -1,7 +1,6 @@
 import sys
 import types
 
-import notte_browser.playwright as playwright_module
 import pytest
 from notte_browser.playwright import PlaywrightManager
 from notte_browser.window import BrowserResource, BrowserWindow, BrowserWindowOptions
@@ -84,12 +83,7 @@ async def test_create_playwright_browser_uses_async_camoufox(monkeypatch: pytest
 
 
 @pytest.mark.asyncio
-async def test_get_browser_resource_omits_user_agent_for_camoufox(monkeypatch: pytest.MonkeyPatch):
-    class FakeBrowserResource:
-        def __init__(self, page, options):
-            self.page = page
-            self.options = options
-
+async def test_get_browser_resource_omits_user_agent_for_camoufox():
     class FakePage:
         pass
 
@@ -112,7 +106,6 @@ async def test_get_browser_resource_omits_user_agent_for_camoufox(monkeypatch: p
 
     manager = PlaywrightManager()
     browser = FakeBrowser()
-    monkeypatch.setattr(playwright_module, "BrowserResource", FakeBrowserResource)
 
     resource = await manager.get_browser_resource(_make_options(), browser)
 

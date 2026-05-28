@@ -182,6 +182,14 @@ class PlaywrightManager(BaseModel, BaseWindowManager):
                 page = await context.new_page()
             else:
                 page = context.pages[-1]
+            if options.browser_type == "camoufox":
+                # Camoufox is built on Playwright even when Notte's default
+                # backend is Patchright. Avoid validating its Page object
+                # against Patchright's Page class.
+                return BrowserResource.model_construct(
+                    page=page,
+                    options=options,
+                )
             return BrowserResource(
                 page=page,
                 options=options,
