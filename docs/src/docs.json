@@ -342,6 +342,7 @@
               {
                 "group": "Resources",
                 "pages": [
+                  "resources",
                   "pricing",
                   "rate-limits",
                   "guides/vibe-coding"
@@ -368,24 +369,6 @@
                   "community/trustpilot",
                   "community/producthunt",
                   "community/youtube"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Updates",
-            "groups": [
-              {
-                "group": "Updates",
-                "pages": [
-                  "changelog"
-                ]
-              },
-              {
-                "group": "Releases",
-                "pages": [
-                  "releases/github",
-                  "releases/pypi"
                 ]
               }
             ]

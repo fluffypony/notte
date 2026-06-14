@@ -220,6 +220,8 @@ Full Quickstart: https://docs.notte.cc/quickstart.md
 
 ## Profiles
 
+- [GET Profile Cookies Get](https://docs.notte.cc/api-reference/profiles/profile-cookies-get.md)
+- [POST Profile Cookies Set](https://docs.notte.cc/api-reference/profiles/profile-cookies-set.md)
 - [POST Profile Create](https://docs.notte.cc/api-reference/profiles/profile-create.md)
 - [DELETE Profile Delete](https://docs.notte.cc/api-reference/profiles/profile-delete.md)
 - [GET Profile Get](https://docs.notte.cc/api-reference/profiles/profile-get.md)
@@ -432,8 +434,7 @@ The SDK docs below are for generated-code editing and reference. They are not th
 
 ## Resources
 
-- [Pricing](https://docs.notte.cc/pricing.md): Simple usage-based pricing with included hours on every plan
-- [Rate Limits](https://docs.notte.cc/rate-limits.md): Feature limits and quotas by plan
+- [Resources](https://docs.notte.cc/resources.md): Quick links to pricing, rate limits, and AI coding setup
 - [Vibe Coding](https://docs.notte.cc/guides/vibe-coding.md): Connect documentation to your AI coding assistant with MCP
 
 ## Legal
@@ -441,13 +442,3 @@ The SDK docs below are for generated-code editing and reference. They are not th
 - [Bug Bounty](https://docs.notte.cc/legal/bug-bounty.md): Report security vulnerabilities responsibly
 
 ## Community
-
-
-
-# Updates
-
-## Updates
-
-- [Changelog](https://docs.notte.cc/changelog.md): Updates and improvements to Notte
-
-## Releases
