@@ -58,13 +58,13 @@ class InvalidURLError(BrowserError):
     ) -> None:
         super().__init__(
             dev_message=(
-                f"Invalid URL: {url}. Check if the URL is reachable. URLs should start with https:// or http://. "
+                f"Invalid URL: {url}. Check if the URL is reachable. URLs should start with https://, http://, or file://. "
             ),
             user_message=(
                 "Impossible to access the given URL. Check if the URL is reachable. "
-                "Remember that URLs should start with https:// or http://"
+                "Remember that URLs should start with https://, http://, or file://"
             ),
-            agent_message=f"Invalid URL: {url}. Hint: URL should start with https:// or http://.",
+            agent_message=f"Invalid URL: {url}. Hint: URL should start with https://, http://, or file://.",
             should_retry_later=False,
         )
 

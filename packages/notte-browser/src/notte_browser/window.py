@@ -2,12 +2,14 @@ import asyncio
 import base64
 import os
 import random
+import re
 import time
 import traceback
 from collections.abc import Awaitable
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Literal, Self
+from urllib.parse import urlparse
 
 import httpx
 from notte_core.browser.dom_tree import A11yNode, A11yTree, DomNode
@@ -47,6 +49,27 @@ from notte_browser.errors import (
     UnexpectedBrowserError,
 )
 from notte_browser.playwright_async_api import CDPSession, Locator, Page, Response
+
+HTTP_GOTO_SCHEMES = {"http", "https"}
+SUPPORTED_GOTO_SCHEMES = {*HTTP_GOTO_SCHEMES, "file"}
+HOST_PORT_URL_RE = re.compile(r"^[^/?#:\\]+:\d+(?:[/?#].*)?$")
+
+
+def _normalize_goto_url(url: str) -> str:
+    parsed_url = urlparse(url)
+    scheme = parsed_url.scheme.lower()
+
+    if len(scheme) == 0 or HOST_PORT_URL_RE.match(url) is not None:
+        logger.info(f"Provided URL doesnt have a scheme, adding https to {url}")
+        return "https://" + url
+
+    if scheme not in SUPPORTED_GOTO_SCHEMES:
+        raise InvalidURLError(url=url)
+
+    if scheme in HTTP_GOTO_SCHEMES and not is_valid_url(url, check_reachability=False):
+        raise InvalidURLError(url=url)
+
+    return url
 
 
 class BrowserWindowOptions(BaseModel):
@@ -642,16 +665,7 @@ class BrowserWindow(BaseModel):
     async def goto(self, url: str, tries: int = 3) -> None:
         if url == self.page.url:
             return
-        prefixes = ("http://", "https://")
-
-        if not any(url.startswith(prefix) for prefix in prefixes):
-            logger.info(f"Provided URL doesnt have a scheme, adding https to {url}")
-            url = "https://" + url
-
-        if not is_valid_url(url, check_reachability=False):
-            raise InvalidURLError(url=url)
-
-        await self.goto_and_wait(url=url, tries=tries, operation=None)
+        await self.goto_and_wait(url=_normalize_goto_url(url), tries=tries, operation=None)
 
     async def set_cookies(self, cookies: list[CookieDict] | None = None, cookie_path: str | Path | None = None) -> None:
         if cookies is None and cookie_path is not None:
